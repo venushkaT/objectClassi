@@ -21,7 +21,7 @@ if not os.path.exists('./mlp_img'):
 def to_img(x):
     x = 0.5 * (x + 1)
     x = x.clamp(0, 1)
-    x = x.view(x.size(0), 2, 32, 32)
+    x = x.view(x.size(0), 3, 32, 32)
     return x
 
 
@@ -52,10 +52,10 @@ class Autoencoder(nn.Module):
             nn.ReLU(True),
             nn.Linear(64, 12),
             nn.ReLU(True),
-            nn.Linear(12, 3))
+            nn.Linear(12, 10))
 
         self.decoder = nn.Sequential(
-            nn.Linear(3, 12),
+            nn.Linear(10, 12),
             nn.ReLU(True),
             nn.Linear(12, 64),
             nn.ReLU(True),
@@ -72,7 +72,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train Autoencoder")
     parser.add_argument("--valid", action="store_true", default=False,
                         help="Perform validation only.")
-    parser.add_argument("--predict", action="store_true", default=False,
+    parser.add_argument("--train", action="store_true", default=False,
                         help="Perform Prediction accuracy")
     args = parser.parse_args()
 
@@ -107,39 +107,50 @@ def main():
         img, labels = dataiter.next()
 
         print('GroundTruth: ', ' '.join('%5s' % classes[labels[j]] for j in range(4)))
-        # imshow(torchvision.utils.make_grid(img))
+        imshow(torchvision.utils.make_grid(to_img(img)))
 
         img = img.view(img.size(0), -1)
         img = get_torch_vars(img)
         encode, decode = model(img)
         # convert into 3x32x 32
-        image = decode.view(decode.size(0), 3, 32, 32)
-        imshow(torchvision.utils.make_grid(image.data))
+        imshow(torchvision.utils.make_grid(to_img(decode).data))
+        exit(0)
+
+    if args.train:
+        for epoch in range(num_epochs):
+            running_loss = 0.0
+            for i, data in enumerate(dataloader, 0):
+                img, labels = data
+                img = img.view(img.size(0), -1)
+                img = get_torch_vars(img)
+                # ============ Forward ============
+                encode, decode = model(img)
+
+                loss = criterion(decode, img)
+                # ============ Backward ============
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                # ============ Logging ============
+                running_loss += loss.data
+                if i % 2000 == 1999:
+                    print('[%d, %5d] loss: %.3f' %
+                          (epoch + 1, i + 1, running_loss / 2000))
+                    running_loss = 0.0
+
+        torch.save(model.state_dict(), './sim_autoencoder.pth')
+        exit(0)
 
 
-    for epoch in range(num_epochs):
-        running_loss = 0.0
-        for i, data in enumerate(dataloader, 0):
-            img, labels = data
-            img = img.view(img.size(0), -1)
-            img = get_torch_vars(img)
-            # ============ Forward ============
-            encode, decode = model(img)
-
-            loss = criterion(decode, img)
-            # ============ Backward ============
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            # ============ Logging ============
-            running_loss += loss.data
-            if i % 2000 == 1999:
-                print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, running_loss / 2000))
-                running_loss = 0.0
-
-    torch.save(model.state_dict(), './sim_autoencoder.pth')
+    # Print all the parameters in model
+    model.load_state_dict(torch.load("./sim_autoencoder.pth"))
+    for name, param in model.named_parameters():
+        print('name: ', name)
+        print(type(param))
+        print('param.shape: ', param.shape)
+        print('param.requires_grad: ', param.requires_grad)
+        print('=====')
 
 
 if __name__ == '__main__':
