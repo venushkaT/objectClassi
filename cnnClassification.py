@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 import matplotlib.pyplot as plt
 from autoEncorder import Autoencoder
+from torch.utils.tensorboard import SummaryWriter
 
 
 def to_img(x):
@@ -79,9 +80,9 @@ class CNN(nn.Module):
 
         self.fc_layer = nn.Sequential(
             nn.Dropout(p=0.1),
-            nn.Linear(1024, 512),
+            nn.Linear(1024, 512), #4096, 1024, 512
             nn.ReLU(inplace=True),
-            nn.Linear(512, 256),
+            nn.Linear(512, 256), # 512
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.1),
             nn.Linear(256, 10)
@@ -90,17 +91,12 @@ class CNN(nn.Module):
     def forward(self, x):
 
         x = self.encode(x)
-
         x = x.view(x.size(0), 3, 16, 16)
-
         x = self.conv_layer(x)
-
         # flatten
         x = x.view(x.size(0), -1)
-
         # fc layer
         x = self.fc_layer(x)
-
         return x
 
 def main():
@@ -132,6 +128,7 @@ def main():
 
     # load AutoEncoder model
     model = CNN().cuda()
+    writer = SummaryWriter()
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(
         model.parameters(), lr=learning_rate, weight_decay=1e-5)
@@ -191,10 +188,21 @@ def main():
 
                 # ============ Logging ============
                 running_loss += loss.data
-                if i % 2000 == 1999:
-                    print('[%d, %5d] loss: %.3f' %
-                          (epoch + 1, i + 1, running_loss / 2000))
-                    running_loss = 0.0
+
+                _, argmax = torch.max(output, 1)
+                accuracy = (labels == argmax.squeeze()).float().mean()
+                if (epoch + 1) % 100 == 0:
+                    print('Step [{}/{}], Loss: {:.4f}, Acc: {:.2f}'
+                          .format(epoch + 1, num_epochs, loss.item(), accuracy.item()))
+
+                    # ================================================================== #
+                    #                        Tensorboard Logging                         #
+                    # ================================================================== #
+                    writer.add_scalar('Accuracy/LR', accuracy, learning_rate)
+                    writer.add_scalar('Loss/test', running_loss, learning_rate)
+
+
+
 
         torch.save(model.state_dict(), './classification.pth')
         exit(0)
