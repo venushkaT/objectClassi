@@ -41,26 +41,27 @@ def imshow(img):
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
 
+
 class Autoencoder(nn.Module):
     def __init__(self):
         super(Autoencoder, self).__init__()
 
         self.encoder = nn.Sequential(
-            nn.Linear(3 * 32 * 32, 128),
+            nn.Linear(3 * 32 * 32, 3 * 28 * 28),
             nn.ReLU(True),
-            nn.Linear(128, 64),
+            nn.Linear(3 * 28 * 28, 3 * 24 * 24),
             nn.ReLU(True),
-            nn.Linear(64, 12),
+            nn.Linear(3 * 24 * 24, 3 * 20 * 20),
             nn.ReLU(True),
-            nn.Linear(12, 10))
+            nn.Linear(3 * 20 * 20, 3 * 16 * 16))
 
         self.decoder = nn.Sequential(
-            nn.Linear(10, 12),
+            nn.Linear(3 * 16 * 16, 3 * 20 * 20),
             nn.ReLU(True),
-            nn.Linear(12, 64),
+            nn.Linear(3 * 20 * 20, 3 * 24 * 24),
             nn.ReLU(True),
-            nn.Linear(64, 128),
-            nn.ReLU(True), nn.Linear(128, 3 * 32 * 32), nn.Tanh())
+            nn.Linear(3 * 24 * 24, 3 * 28 * 28),
+            nn.ReLU(True), nn.Linear(3 * 28 * 28, 3 * 32 * 32), nn.Tanh())
 
     def forward(self, x):
         encode = self.encoder(x)
@@ -74,6 +75,10 @@ def main():
                         help="Perform validation only.")
     parser.add_argument("--train", action="store_true", default=False,
                         help="Perform Prediction accuracy")
+
+    parser.add_argument("--freeze", action="store_true", default=False,
+                        help="freeze encoder layers")
+
     args = parser.parse_args()
 
     # Create model
@@ -141,6 +146,15 @@ def main():
 
         torch.save(model.state_dict(), './sim_autoencoder.pth')
         exit(0)
+    if args.freeze:
+        model.load_state_dict(torch.load("./sim_autoencoder.pth"))
+        encodeLayer = nn.Sequential(*list(model.children())[0:1])
+        for name, param in encodeLayer.named_parameters():
+            param.requires_grad = False
+
+        exit(0)
+
+
 
 
     # Print all the parameters in model
