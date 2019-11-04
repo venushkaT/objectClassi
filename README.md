@@ -9,13 +9,19 @@ The task is achieved using two different network architectures.
  - Python3.6+
  - matplotlib
  - pytorch1.3
- - torchvision
+ - torchvision 0.4.1
  
 ### Train
-To train model
+To train model (Autoencoder)
 
-    python model1.py
-To train model two 
+    python autoEncorder.py --train
+To train CNN model  
+
+    python cnnClassification.py --train
+
+To test CNN model
+    
+    python cnnClassification.py --valid
 
 
 
