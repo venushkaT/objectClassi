@@ -1,21 +1,15 @@
 __author__ = 'Venushka Thisara'
 
-import numpy as np
+import argparse
 # OS
 import os
-import argparse
 
-
+import matplotlib.pyplot as plt
 import torch
-import torchvision
 from torch import nn
 from torch.autograd import Variable
-from torch.utils.data import DataLoader
-from torchvision import transforms
-import matplotlib.pyplot as plt
-
-if not os.path.exists('./mlp_img'):
-    os.mkdir('./mlp_img')
+from DataSetClass import *
+from torch.utils.data import Dataset, DataLoader
 
 
 def to_img(x):
@@ -25,7 +19,7 @@ def to_img(x):
     return x
 
 
-num_epochs = 100
+num_epochs = 20
 batch_size = 128
 learning_rate = 1e-3
 
@@ -82,43 +76,39 @@ def main():
     args = parser.parse_args()
 
     # Create model
-    img_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
+    kwargs = {'num_workers': 8, 'pin_memory': False}
+    dataloader = DataLoader(cat_dog_trainset, batch_size=64, shuffle=True, **kwargs)
+    testloader = DataLoader(cat_dog_testset, batch_size=64, shuffle=False, **kwargs)
 
-    dataset = torchvision.datasets.CIFAR10(root='./data', train=True,
-                                           download=True, transform=img_transform)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 
-    # for testing purpose
-    testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                           download=True, transform=img_transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                             shuffle=False, num_workers=8)
-
-    classes = ('plane', 'car', 'bird', 'cat',
-               'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-
-    model = Autoencoder().cuda()
+    model = Autoencoder().float().cuda()
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(
         model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
+    #https://gist.github.com/Miladiouss/6ba0876f0e2b65d0178be7274f61ad2f
+
     if args.valid:
         print("Loading checkpoint...")
         model.load_state_dict(torch.load("./sim_autoencoder.pth"))
-        dataiter = iter(testloader)
-        img, labels = dataiter.next()
 
-        print('GroundTruth: ', ' '.join('%5s' % classes[labels[j]] for j in range(4)))
-        imshow(torchvision.utils.make_grid(to_img(img)))
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for data in testloader:
+                img, labels = data
 
-        img = img.view(img.size(0), -1)
-        img = get_torch_vars(img)
-        encode, decode = model(img)
-        # convert into 3x32x 32
-        imshow(torchvision.utils.make_grid(to_img(decode).data))
+                img = img.view(img.size(0), -1)
+
+                img = get_torch_vars(img)
+                labels = get_torch_vars(labels)
+                encode, decode = model(img.float())
+                _, predicted = torch.max(encode.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+        print('Accuracy of the network on the 10000 test images: %d %%' % (
+                100 * correct / total))
         exit(0)
 
     if args.train:
@@ -126,12 +116,15 @@ def main():
             running_loss = 0.0
             for i, data in enumerate(dataloader, 0):
                 img, labels = data
+
                 img = img.view(img.size(0), -1)
+
                 img = get_torch_vars(img)
                 # ============ Forward ============
-                encode, decode = model(img)
 
-                loss = criterion(decode, img)
+                encode, decode = model(img.float())
+
+                loss = criterion(decode.float(), img.float())
                 # ============ Backward ============
                 optimizer.zero_grad()
                 loss.backward()
@@ -139,9 +132,9 @@ def main():
 
                 # ============ Logging ============
                 running_loss += loss.data
-                if i % 2000 == 1999:
+                if i % 2 == 0:
                     print('[%d, %5d] loss: %.3f' %
-                          (epoch + 1, i + 1, running_loss / 2000))
+                          (epoch + 1, i + 1, running_loss / 2))
                     running_loss = 0.0
 
         torch.save(model.state_dict(), './sim_autoencoder.pth')
@@ -153,8 +146,6 @@ def main():
             param.requires_grad = False
 
         exit(0)
-
-
 
 
     # Print all the parameters in model

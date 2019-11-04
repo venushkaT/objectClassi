@@ -12,7 +12,10 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 import matplotlib.pyplot as plt
 from autoEncorder import Autoencoder
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
+import torchvision.utils as vutils
+from DataSetClass import *
+from torch.utils.data import Dataset, DataLoader
 
 
 def to_img(x):
@@ -22,9 +25,11 @@ def to_img(x):
     return x
 
 
-num_epochs = 100
+num_epochs = 2
 batch_size = 128
 learning_rate = 1e-3
+
+visualisation = {}
 
 
 def get_torch_vars(x):
@@ -38,16 +43,10 @@ def imshow(img):
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
 
+
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-
-        modelAutoEncode = Autoencoder()
-        modelAutoEncode.load_state_dict(torch.load("./sim_autoencoder.pth"))
-        encodeFreeze = nn.Sequential(*list(modelAutoEncode.children())[:-1])
-        for name, param in encodeFreeze.named_parameters():
-            param.requires_grad = False
-        self.encode = encodeFreeze
 
         self.conv_layer = nn.Sequential(
 
@@ -77,27 +76,24 @@ class CNN(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
 
-
         self.fc_layer = nn.Sequential(
             nn.Dropout(p=0.1),
-            nn.Linear(1024, 512), #4096, 1024, 512
+            nn.Linear(1024, 512),  # 4096, 1024, 512
             nn.ReLU(inplace=True),
-            nn.Linear(512, 256), # 512
+            nn.Linear(512, 256),  # 512
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.1),
             nn.Linear(256, 10)
         )
 
     def forward(self, x):
-
-        x = self.encode(x)
-        x = x.view(x.size(0), 3, 16, 16)
         x = self.conv_layer(x)
         # flatten
         x = x.view(x.size(0), -1)
         # fc layer
         x = self.fc_layer(x)
         return x
+
 
 def main():
     parser = argparse.ArgumentParser(description="Train Autoencoder")
@@ -108,27 +104,17 @@ def main():
     args = parser.parse_args()
 
     # Create model
-    img_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
+    kwargs = {'num_workers': 8, 'pin_memory': False}
+    dataloader = DataLoader(cat_dog_trainset, batch_size=64, shuffle=True, **kwargs)
+    testloader = DataLoader(cat_dog_testset, batch_size=64, shuffle=False, **kwargs)
 
-    dataset = torchvision.datasets.CIFAR10(root='./data', train=True,
-                                           download=True, transform=img_transform)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8)
+    classes = ('cat',  'dog')
 
-    # for testing purpose
-    testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                           download=True, transform=img_transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                             shuffle=False, num_workers=8)
-
-    classes = ('plane', 'car', 'bird', 'cat',
-               'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    ae_model = Autoencoder().float().cuda()
+    ae_model.load_state_dict(torch.load("./sim_autoencoder.pth"))
 
     # load AutoEncoder model
     model = CNN().cuda()
-    writer = SummaryWriter()
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(
         model.parameters(), lr=learning_rate, weight_decay=1e-5)
@@ -136,19 +122,9 @@ def main():
     if args.valid:
         print("Loading checkpoint...")
         model = CNN().cuda()
+        ae_model = Autoencoder().float().cuda()
         model.load_state_dict(torch.load("./classification.pth"))
-        dataiter = iter(testloader)
-        img, labels = dataiter.next()
-        img = img.view(img.size(0), -1)
-        img = get_torch_vars(img)
-        labels = get_torch_vars(labels)
-        output = model(img)
-
-
-        _, predicted = torch.max(output, 1)
-        print('groundTruth: ', ' '.join('%5s' % classes[labels[j]] for j in range(4)))
-        print('Predicted: ', ' '.join('%5s' % classes[predicted[j]] for j in range(4)))
-
+        ae_model.load_state_dict(torch.load("./sim_autoencoder.pth"))
         correct = 0
         total = 0
         with torch.no_grad():
@@ -157,13 +133,18 @@ def main():
                 img = img.view(img.size(0), -1)
                 img = get_torch_vars(img)
                 labels = get_torch_vars(labels)
-                x = model(img).cuda()
-                _, predicted = torch.max(x.data, 1)
+                encode, decode = ae_model(img.float())
+                encode = encode.view(encode.size(0), 3, 16, 16)
+                output = model(encode)
+                _, predicted = torch.max(output.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
         print('Accuracy of the network on the 10000 test images: %d %%' % (
                 100 * correct / total))
+        exit(0)
+
+
 
         exit(0)
 
@@ -173,12 +154,16 @@ def main():
             running_loss = 0.0
             for i, data in enumerate(dataloader, 0):
                 img, labels = data
-                img = img.view(img.size(0), -1)
                 img = get_torch_vars(img)
                 labels = get_torch_vars(labels)
+
                 # ============ Forward ============
 
-                output = model(img)
+                img = img.view(img.size(0), -1)
+                encode, decode = ae_model(img.float())
+
+                encode = encode.view(encode.size(0), 3, 16, 16)
+                output = model(encode)
 
                 loss = criterion(output, labels)
                 # ============ Backward ============
@@ -189,21 +174,14 @@ def main():
                 # ============ Logging ============
                 running_loss += loss.data
 
-                _, argmax = torch.max(output, 1)
-                accuracy = (labels == argmax.squeeze()).float().mean()
-                if (epoch + 1) % 100 == 0:
-                    print('Step [{}/{}], Loss: {:.4f}, Acc: {:.2f}'
-                          .format(epoch + 1, num_epochs, loss.item(), accuracy.item()))
+                running_loss += loss.item()
+                if i % 2 == 0:  # print every 2000 mini-batches
+                    print('[%d, %5d] loss: %.3f' %
+                          (epoch + 1, i + 1, running_loss / 2))
+                    running_loss = 0.0
 
-                    # ================================================================== #
-                    #                        Tensorboard Logging                         #
-                    # ================================================================== #
-                    writer.add_scalar('Accuracy/LR', accuracy, learning_rate)
-                    writer.add_scalar('Loss/test', running_loss, learning_rate)
-
-
-
-
+                    # needs tensorboard 0.4RC or later
+        print('Finished Training')
         torch.save(model.state_dict(), './classification.pth')
         exit(0)
 
