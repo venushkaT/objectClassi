@@ -10,6 +10,7 @@ The task is achieved using two different network architectures.
  - matplotlib
  - pytorch1.3
  - torchvision 0.4.1
+ - tensorboard
  
 ### Train
 To train model (Autoencoder)
@@ -22,6 +23,15 @@ To train CNN model
 To test CNN model
     
     python cnnClassification.py --valid
+    
+##visualization 
+To Autoencorder 
+
+    tensorboard --logdir="logs2"
+    
+To Classification model
+
+    tensorboard --logdir="logs"
 
 
 
