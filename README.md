@@ -16,6 +16,10 @@ The task is achieved using two different network architectures.
 To train model (Autoencoder)
 
     python autoEncorder.py --train
+    
+To see the Output of Auto Encoder 
+
+    python autoEncorder.py --valid
 To train CNN model  
 
     python cnnClassification.py --train
