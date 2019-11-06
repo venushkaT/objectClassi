@@ -117,9 +117,7 @@ def main():
             running_loss = 0.0
             for i, data in enumerate(dataloader, 0):
                 img, labels = data
-
                 img = img.view(img.size(0), -1)
-
                 img = get_torch_vars(img)
                 # ============ Forward ============
 

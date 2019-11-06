@@ -85,30 +85,104 @@ class DatasetMaker(Dataset):
 # ================== Usage ================== #
 
 plane = get_class_i(x_train, y_train, classDict['plane'])
+# for training data 60%
+start_index = int(len(plane)*0.6)
+end_index = int(len(plane))
+train_plane = plane[0:start_index]
+# for testing data 40%
+test_plane = plane[start_index:end_index]
+
+
 car = get_class_i(x_train, y_train, classDict['car'])
+start_index = int(len(car)*0.6)
+end_index = int(len(car))
+# for training data 60%
+train_car = car[0:start_index]
+# for testing data 40%
+test_car = car[start_index:end_index]
+
 bird = get_class_i(x_train, y_train, classDict['bird'])
 # 50% of bird data
 bird = bird[0:int(len(bird)/2)]
+start_index = int(len(bird)*0.6)
+end_index = int(len(bird))
+# for training data 60%
+train_bird = bird[0:start_index]
+# for testing data 40%
+test_bird = bird[start_index:end_index]
+
+
 cat = get_class_i(x_train, y_train, classDict['cat'])
+start_index = int(len(cat)*0.6)
+end_index = int(len(cat))
+# for training data 60%
+train_cat = cat[0:start_index]
+# for testing data 40%
+test_cat = cat[start_index:end_index]
+
+
 deer = get_class_i(x_train, y_train, classDict['deer'])
 # 50% of deer data
 deer = deer[0:int(len(deer)/2)]
+start_index = int(len(deer)*0.6)
+end_index = int(len(deer))
+# for training data 60%
+train_deer = deer[0:start_index]
+# for testing data 40%
+test_deer = deer[start_index:end_index]
+
+
 dog = get_class_i(x_train, y_train, classDict['dog'])
+start_index = int(len(dog)*0.6)
+end_index = int(len(dog))
+# for training data 60%
+train_dog = dog[0:start_index]
+# for testing data 40%
+test_dog = dog[start_index:end_index]
+
 frog = get_class_i(x_train, y_train, classDict['frog'])
+start_index = int(len(frog)*0.6)
+end_index = int(len(frog))
+# for training data 60%
+train_frog = frog[0:start_index]
+# for testing data 40%
+test_frog = frog[start_index:end_index]
+
 horse = get_class_i(x_train, y_train, classDict['horse'])
+start_index = int(len(horse)*0.6)
+end_index = int(len(horse))
+# for training data 60%
+train_horse = horse[0:start_index]
+# for testing data 40%
+test_horse = horse[start_index:end_index]
+
 ship = get_class_i(x_train, y_train, classDict['ship'])
+start_index = int(len(ship)*0.6)
+end_index = int(len(ship))
+# for training data 60%
+train_ship = ship[0:start_index]
+# for testing data 40%
+test_ship = ship[start_index:end_index]
+
 truck = get_class_i(x_train, y_train, classDict['truck'])
 # 50% of truck data
 truck = truck[0:int(len(truck)/2)]
+start_index = int(len(truck)*0.6)
+end_index = int(len(truck))
+# for training data 60%
+train_truck = cat[0:start_index]
+# for testing data 40%
+test_truck = cat[start_index:end_index]
 
 trainset = \
     DatasetMaker(
-        [plane, car, bird, deer, frog, horse, truck],
+        [train_plane, train_car, train_bird, train_deer, train_frog, train_horse, train_truck],
         transform_no_aug
     )
+
 testset = \
     DatasetMaker(
-        [plane, car, bird, deer, frog, horse, truck],
+        [test_plane, test_car, test_bird, test_deer, test_frog, test_horse, test_truck],
         transform_no_aug
     )
 

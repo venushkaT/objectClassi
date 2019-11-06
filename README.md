@@ -24,7 +24,7 @@ To test CNN model
     
     python cnnClassification.py --valid
     
-##visualization 
+### Visualization
 To Autoencorder 
 
     tensorboard --logdir="logs2"

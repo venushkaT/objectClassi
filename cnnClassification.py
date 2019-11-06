@@ -102,27 +102,34 @@ def main():
 
     if args.valid:
         print("Loading checkpoint...")
+        writer = SummaryWriter(log_dir="./logs1")
         model = CNN().cuda()
         ae_model = Autoencode().cuda()
         model.load_state_dict(torch.load("./classification.pth"))
         ae_model.load_state_dict(torch.load("./sim_autoencoder.pth"))
-        correct = 0
-        total = 0
-        with torch.no_grad():
-            for data in testloader:
-                img, labels = data
-                img = img.view(img.size(0), -1)
-                img = get_torch_vars(img)
-                labels = get_torch_vars(labels)
-                encode, decode = ae_model(img)
-                encode = encode.view(encode.size(0), 3, 16, 16)
-                output = model(encode)
-                _, predicted = torch.max(output.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+        for epoch in range(num_epochs):
+            with torch.no_grad():
+                total = 0
+                correct = 0
+                for i, data in enumerate(testloader, 0):
+                    img, labels = data
+                    img = img.view(img.size(0), -1)
+                    img = get_torch_vars(img)
+                    labels = get_torch_vars(labels)
+                    encode, decode = ae_model(img)
+                    encode = encode.view(encode.size(0), 3, 16, 16)
+                    output = model(encode)
 
-        print('Accuracy of the network on the 10000 test images: %d %%' % (
-                100 * correct / total))
+                    if i % 2000 == 0:
+                        _, predicted = torch.max(output.data, 1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                        accuracy = 100 * (correct / total)
+                        writer.add_scalar("Testing accuracy", accuracy, epoch)
+                        correct = 0.0
+                        total = 0
+
+        writer.close()
         exit(0)
 
     if args.train:
@@ -165,11 +172,13 @@ def main():
 
                     accuracy = 100 * (correct / total)
 
-                    writer.add_scalar("accuracy", accuracy, epoch)
+                    writer.add_scalar("Training accuracy", accuracy, epoch)
 
                     print('[%d, %5d] loss: %.3f Accu: %.3f' %
                           (epoch + 1, i + 1, running_loss, accuracy))
                     running_loss = 0.0
+                    correct = 0.0
+                    total = 0
 
         print('Finished Training')
         torch.save(model.state_dict(), './classification.pth')
